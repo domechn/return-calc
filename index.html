@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>投资回报率计算器</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        .investment-form {
+            border: 1px solid #ddd;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+            position: relative;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input {
+            width: 200px;
+            padding: 5px;
+            margin-right: 10px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .remove-btn {
+            background-color: #f44336;
+        }
+        .remove-btn:hover {
+            background-color: #da190b;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .summary {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #ddd;
+        }
+        .saved-portfolios {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f0f8ff;
+            border-radius: 5px;
+        }
+        .portfolio-actions {
+            margin-top: 20px;
+            padding: 10px 0;
+            border-top: 1px solid #ddd;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .load-btn {
+            background-color: #2196F3;
+        }
+        .load-btn:hover {
+            background-color: #1976D2;
+        }
+        .delete-btn {
+            background-color: #f44336;
+        }
+        .saved-portfolio {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            background-color: white;
+        }
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background-color: #333;
+            color: white;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .tabs {
+            margin-bottom: 15px;
+            border-bottom: 1px solid #ddd;
+        }
+        .tab-button {
+            background-color: gray;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            margin-right: 5px;
+            border-radius: 4px 4px 0 0;
+        }
+        .tab-button.active {
+            background-color: #4CAF50;
+            border-bottom: 2px solid #4CAF50;
+            margin-bottom: -1px;
+            font-weight: bold;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <h1>投资组合回报率计算器</h1>
+    
+    <div id="investments-container"></div>
+    
+    <div class="action-buttons">
+        <button onclick="addInvestment()">添加投资产品</button>
+        <button onclick="calculateReturns()">计算总回报</button>
+        <button onclick="savePortfolio()">保存当前组合</button>
+    </div>
+
+    <div id="saved-portfolios" class="saved-portfolios">
+        <h2>已保存的投资组合</h2>
+        <div id="portfolios-list"></div>
+    </div>
+    
+    <div id="result" class="result" style="display: none;">
+        <h2>计算结果</h2>
+        
+        <table id="results-table">
+            <thead>
+                <tr>
+                    <th>产品名称</th>
+                    <th>投资金额</th>
+                    <th>年化收益率</th>
+                    <th>预计年回报金额</th>
+                </tr>
+            </thead>
+            <tbody id="results-body"></tbody>
+        </table>
+
+        <div class="summary">
+            <h3>汇总信息</h3>
+            <p>平均年化回报率: <span id="avgReturn">0</span>%</p>
+            <p>总投资金额: ¥<span id="totalInvestmentAmount">0</span></p>
+            <p>总回报金额: ¥<span id="totalReturn">0</span></p>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        let investmentCount = 0;
+        const STORAGE_KEY = 'investment-portfolios';
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.style.display = 'block';
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 3000);
+        }
+        function switchTab(investmentId, tabType) {
+            const form = document.getElementById(`investment-${investmentId}`);
+            const tabs = form.getElementsByClassName('tab-button');
+            const contents = form.getElementsByClassName('tab-content');
+            
+            // 更新标签按钮状态
+            Array.from(tabs).forEach(tab => tab.classList.remove('active'));
+            form.querySelector(`.tab-button:${tabType === 'annual' ? 'first-child' : 'last-child'}`).classList.add('active');
+            
+            // 更新内容显示
+            Array.from(contents).forEach(content => content.classList.remove('active'));
+            form.querySelector(`.${tabType}-tab`).classList.add('active');
+        }
+        function addInvestment() {
+            const container = document.getElementById('investments-container');
+            const div = document.createElement('div');
+            div.className = 'investment-form';
+            div.id = `investment-${investmentCount}`;
+            
+            div.innerHTML = `
+                <h3>投资产品 ${investmentCount + 1}</h3>
+                <div class="form-group">
+                    <label>产品名称:</label>
+                    <input type="text" class="product-name" required>
+                </div>
+                <div class="form-group">
+                    <label>投资金额 (元):</label>
+                    <input type="number" class="investment-amount" required>
+                </div>
+                <div class="tabs">
+                    <button class="tab-button active" onclick="switchTab(${investmentCount}, 'annual')">年化收益率</button>
+                    <button class="tab-button" onclick="switchTab(${investmentCount}, 'actual')">实际收益</button>
+                </div>
+                <div class="tab-content annual-tab active">
+                    <div class="form-group">
+                        <label>年化收益率 (%):</label>
+                        <input type="number" class="annual-return" step="0.01" onchange="clearActualReturn(${investmentCount})">
+                    </div>
+                </div>
+                <div class="tab-content actual-tab">
+                    <div class="form-group">
+                        <label>实际收益金额 (元):</label>
+                        <input type="number" class="actual-return" step="0.01" onchange="clearAnnualReturn(${investmentCount})">
+                    </div>
+                    <div class="form-group">
+                        <label>持有天数:</label>
+                        <input type="number" class="days-held" value="1">
+                    </div>
+                </div>
+                <button class="remove-btn" onclick="removeInvestment(${investmentCount})">删除</button>
+            `;
+            
+            container.appendChild(div);
+            investmentCount++;
+        }
+
+	function clearAnnualReturn(investmentId) {
+            const form = document.getElementById(`investment-${investmentId}`);
+            form.querySelector('.annual-return').value = '';
+        }
+
+        function clearActualReturn(investmentId) {
+            const form = document.getElementById(`investment-${investmentId}`);
+            form.querySelector('.actual-return').value = '';
+            form.querySelector('.days-held').value = '1';
+        }
+
+        function removeInvestment(id) {
+            const element = document.getElementById(`investment-${id}`);
+            element.remove();
+        }
+
+        function calculateReturns() {
+            let totalInvestment = 0;
+            let weightedReturn = 0;
+            let totalActualReturn = 0;
+            const resultsBody = document.getElementById('results-body');
+            resultsBody.innerHTML = '';
+
+            const forms = document.getElementsByClassName('investment-form');
+            
+            for (let form of forms) {
+                const name = form.querySelector('.product-name').value || '未命名产品';
+                const amount = parseFloat(form.querySelector('.investment-amount').value) || 0;
+                const annualReturn = parseFloat(form.querySelector('.annual-return').value);
+                const actualReturn = parseFloat(form.querySelector('.actual-return').value);
+                const daysHeld = parseFloat(form.querySelector('.days-held').value) || 1;
+
+                if (amount > 0) {
+                    totalInvestment += amount;
+                    let effectiveAnnualReturn = 0;
+                    let yearReturn = 0;
+
+                    if (!isNaN(annualReturn)) {
+                        effectiveAnnualReturn = annualReturn;
+			
+                        yearReturn = amount * annualReturn / 100 ;
+			console.log(yearReturn);
+			
+                        weightedReturn += (amount * annualReturn);
+                        totalActualReturn += yearReturn;
+                    } else if (!isNaN(actualReturn)) {
+                        effectiveAnnualReturn = (actualReturn / amount * 365 / daysHeld * 100);
+                        yearReturn = actualReturn * 365 / daysHeld;
+                        weightedReturn += (amount * effectiveAnnualReturn);
+                        totalActualReturn += yearReturn;
+                    }
+
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${name}</td>
+                        <td>¥${amount.toFixed(2)}</td>
+                        <td>${effectiveAnnualReturn.toFixed(2)}%</td>
+                        <td>¥${yearReturn.toFixed(2)}</td>
+                    `;
+                    resultsBody.appendChild(row);
+                }
+            }
+
+            const avgReturn = totalInvestment > 0 ? (weightedReturn / totalInvestment) : 0;
+
+            document.getElementById('result').style.display = 'block';
+            document.getElementById('avgReturn').textContent = avgReturn.toFixed(2);
+            document.getElementById('totalInvestmentAmount').textContent = totalInvestment.toFixed(2);
+            document.getElementById('totalReturn').textContent = totalActualReturn.toFixed(2);
+        }
+
+        function getPortfolioData() {
+            const forms = document.getElementsByClassName('investment-form');
+            const investments = [];
+            
+            for (let form of forms) {
+                investments.push({
+                    name: form.querySelector('.product-name').value,
+                    amount: form.querySelector('.investment-amount').value,
+                    annualReturn: form.querySelector('.annual-return').value,
+                    actualReturn: form.querySelector('.actual-return').value,
+                    daysHeld: form.querySelector('.days-held').value
+                });
+            }
+            
+            return investments;
+        }
+
+        function savePortfolio() {
+            const portfolioName = prompt('请输入投资组合名称：');
+            if (!portfolioName) return;
+
+            const portfolios = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+            portfolios[portfolioName] = {
+                date: new Date().toISOString(),
+                investments: getPortfolioData()
+            };
+            
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(portfolios));
+            showToast('投资组合已保存');
+            loadSavedPortfolios();
+        }
+
+        function loadPortfolio(portfolioName) {
+            const portfolios = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+            const portfolio = portfolios[portfolioName];
+            
+            if (!portfolio) return;
+
+            // 清空当前表单
+            document.getElementById('investments-container').innerHTML = '';
+            investmentCount = 0;
+
+            // 加载保存的数据
+            portfolio.investments.forEach(investment => {
+                addInvestment();
+                const form = document.querySelector(`#investment-${investmentCount - 1}`);
+                form.querySelector('.product-name').value = investment.name;
+                form.querySelector('.investment-amount').value = investment.amount;
+                form.querySelector('.annual-return').value = investment.annualReturn;
+                form.querySelector('.actual-return').value = investment.actualReturn;
+                form.querySelector('.days-held').value = investment.daysHeld;
+		console.log(investment);
+		
+
+		if (investment.annualReturn) {
+		    switchTab(investmentCount - 1, 'annual');
+		} else {
+		    switchTab(investmentCount - 1, 'actual');
+		}
+            });
+
+            showToast('投资组合已加载');
+            calculateReturns();
+        }
+
+        function deletePortfolio(portfolioName) {
+            if (!confirm(`确定要删除投资组合"${portfolioName}"吗？`)) return;
+
+            const portfolios = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+            delete portfolios[portfolioName];
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(portfolios));
+            showToast('投资组合已删除');
+            loadSavedPortfolios();
+        }
+
+        function loadSavedPortfolios() {
+            const portfoliosList = document.getElementById('portfolios-list');
+            const portfolios = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+            
+            portfoliosList.innerHTML = '';
+            
+            Object.entries(portfolios).forEach(([name, data]) => {
+                const date = new Date(data.date).toLocaleString();
+                const div = document.createElement('div');
+                div.className = 'saved-portfolio';
+                div.innerHTML = `
+                    <h3>${name}</h3>
+                    <p>保存时间: ${date}</p>
+                    <p>投资产品数: ${data.investments.length}</p>
+                    <div class="action-buttons">
+                        <button class="load-btn" onclick="loadPortfolio('${name}')">加载</button>
+                        <button class="delete-btn" onclick="deletePortfolio('${name}')">删除</button>
+                    </div>
+                `;
+                portfoliosList.appendChild(div);
+            });
+        }
+
+        // 初始化
+        addInvestment();
+        loadSavedPortfolios();
+    </script>
+</body>
+</html>
